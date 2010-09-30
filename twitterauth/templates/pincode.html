@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>{% block title %}Insert you pincode{% endblock %}</h1>
+<p>
+    <a href="{{ auth_url }}" target="_blank">get the pincode</a>
+</p>
+<p>
+    <form method="post" action="{% url auth_callback %}">
+        {% csrf_token %}
+        <table>
+        {{ form }}
+        </table>
+        <input type="submit" value="Allow">
+    </form>
+</p>
+{% endblock %}

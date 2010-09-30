@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>{% block title %}Info for {{ user.username }}{% endblock %}</h1>
+<p>Twitter username: <strong>{{ user.username }}</strong></p>
+{% endblock %}

@@ -1,0 +1,18 @@
+syntax: glob
+.project
+.pydevproject
+.settings
+*~
+*.orig
+*.pyc
+*.pyo
+*.swp
+*.tmp
+_generated_media*
+desktop.ini
+settings_overrides.py
+nbproject
+django
+django_mongodb_engine
+djangotoolbox
+mediagenerator
