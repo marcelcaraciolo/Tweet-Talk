@@ -1,13 +1,14 @@
 #-*- coding:utf-8 -*-
 
-from django.http import HttpResponse
-#from twitterauth.decorators import login_required
-from twitterauth.models import User
 import base64
 import httplib
 import urllib
 import re
+from django.utils import simplejson 
+from django.http import HttpResponse
 from twitterauth import oauth
+from twitterauth.models import User
+
 
 def send_msg(userkey,tp,resp):
 	url = 'www.imified.com'
@@ -58,7 +59,20 @@ def tweet_talk_callback(request,template=""):
 		users = User.objects.filter(userkey__exact = userkey)
 		if users:
 			userP = users[0]
-		 	if step == 2:
+			if step == 1:				
+				#Primeira vez que chegou vamos ver o que fazer
+				credentials = userP.twitter_api.verify_credentials()
+				if credentials:
+					send_msg(userkey, 'Hi %s , from now on you can write your tweet and then it will be posted.'.decode('utf-8') % credentials['screen_name']  , response)
+					userP.name = credentials['name']
+					userP.screename = credentials['screen_name']
+					userP.save()
+					response.write('<goto=2>')
+				else:
+					send_msg(userkey,'Problems in authentication. Try again.',response)
+					userP.delete()
+					response.write('<goto=1>')
+		 	elif step == 2:
 				#recebe o pincode
 				pattern = re.compile("\\d{7}")
 				result = re.findall(pattern,msg)
@@ -67,72 +81,68 @@ def tweet_talk_callback(request,template=""):
 					userP.twitter_api.token = request.user.twitter_api.get_access_token(oauth.OAuthToken.from_string(userP.request_token), verifier=result[0])
 					credentials = userP.twitter_api.verify_credentials()
 					if credentials:
-						send_msg(userkey, 'Olá %s , a partir de agora você poderá escrever seu tweet e ele será postado no seu Twitter. '.decode('utf-8') % credentials['screen_name']  , response)
+						send_msg(userkey, 'Hi %s , from now on you can write your tweet and then it will be posted.'.decode('utf-8') % credentials['screen_name']  , response)
 						userP.key = userP.twitter_api.token.key
 						userP.secret = userP.twitter_api.token.secret
 						userP.name = credentials['name']
 						userP.screename = credentials['screen_name']
 						userP.save()
-						response.write('<goto=3>')
+						response.write('<goto=2>')
 					else:
-						send_msg(userkey,'Problemas na autenticacao. Tente outra vez.',response)
+						send_msg(userkey,'Problems in authentication. Try again.',response)
 						userP.delete()
 						response.write('<goto=1>')
 				else:
-					#So ruido.
-					send_msg(userkey,'Não encontrei o PINCODE ou houve falha na autenticação, comece novamente.'.decode('utf-8') ,response)
-					response.write('<goto=1>')
-			elif step == 3:
-				#Agora so tweetar.
-				userP.twitter_api.tweet(msg)
-				response.write('<goto=3>')
-			elif step == 1:
-				#Primeira vez que chegou vamos ver o que fazer
-				credentials = userP.twitter_api.verify_credentials()
-				if credentials:
-					send_msg(userkey, 'Olá %s , a partir de agora você poderá escrever seu tweet e ele será postado no seu Twitter. '.decode('utf-8') % credentials['screen_name']  , response)
-					userP.name = credentials['name']
-					userP.screename = credentials['screen_name']
-					userP.save()
-					response.write('<goto=3>')
-				else:
-					send_msg(userkey,'Problemas na autenticacao. Tente outra vez.',response)
-					userP.delete()
-					response.write('<goto=1>')
-					
-					
+					#Checa se tem credenciais, entao twitta. (pequeno bug que contornei.)
+					try:
+						credentials = userP.twitter_api.verify_credentials()
+						if credentials:
+							try:
+								if len(msg) > 140:
+									#Mensagens com mais de 140 caracteres tem q haver excecao.
+									raise Exception()
+								resp = userP.twitter_api.tweet(msg.encode('utf-8'))
+								#tudo ok
+								resp  = simplejson.loads(resp)
+								msg = 'Tweet sent successfuly: http://twitter.com/%s/statuses/%s' % (resp['user']['screen_name'], str(resp['id']))
+								send_msg(userkey,msg,response)
+								response.write('<goto=2>')
+							except:
+								#Problemas com o tweet.
+								send_msg(userkey,'Problems in authentication or with the tweet(Remember: limit: 140 characters). Try again.'.decode('utf-8') ,response)
+								response.write('<goto=2>')
+						else:
+							#Problemas com credenciais.
+							send_msg(userkey,'I did not find the PINCODE or there was a failure during the authentication. Start over again.'.decode('utf-8') ,response)
+							userP.delete()
+							response.write('<goto=1>')
+					except:
+						#Problemas com credencial ou pincode .
+						send_msg(userkey,'I did not find the PINCODE or there was a failure during the authentication. Start over again.'.decode('utf-8') ,response)
+						userP.delete()
+						response.write('<goto=1>')
 			else:
-				send_msg(userkey,'stepInside:'+str(step),response)
+				#VOlta para o estado inicial.
 				response.write('<goto=1>')
-					
+						
 		else:
 			#Nao tem usuario no sistema, entao vamos comecar do zero.
 			if step == 1:
 				#avisa ao usuario que nao esta cadastrado.
-				send_msg(userkey,'Usuário não cadastrado. Favor cadastrar sua conta ao TweetTalk no Twitter.'.decode('utf-8'),response)
+				send_msg(userkey,'User still not registered. Please register your Twitter account to TweetTalk.'.decode('utf-8'),response)
 				request_token = request.user.twitter_api.get_request_token(callback="oob")
 				authorization_url = request.user.twitter_api.get_authorization_url(request_token)
 				authorization_url = urllib.urlopen("http://tinyurl.com/api-create.php?url=%s" % urllib.quote(authorization_url)).read()
-				send_msg(userkey,' Me informe o PIN CODE fornecido por este link (Após autenticação): %s'.decode('utf-8') % authorization_url ,response)
+				send_msg(userkey,' Send me the PIN CODE provided by this link (After authentication): %s'.decode('utf-8') % authorization_url ,response)
 				user, created = User.objects.get_or_create(userkey=userkey)
 				user.userkey = userkey
 				user.request_token = request_token.to_string()
 				user.save()
 				response.write('<goto=2>')
 			else:
-				send_msg(userkey,'stepUser:'+str(step),response)
+				#step inicial
 				response.write('<goto=1>')
 					
-
-	#if step == 0:
-	#	x = send_msg(userkey,msg)
-	#	return x
-	#else:
-	#	response.write('indo para o 2')
-	#	response.write('<goto=2>')					
-	return response
 		
-	
-	#return HttpResponse(authorization_url)
-	
+	return response 	
 	
