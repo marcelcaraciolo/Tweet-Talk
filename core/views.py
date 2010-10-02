@@ -96,16 +96,21 @@ def tweet_talk_callback(request,template=""):
 					#Checa se tem credenciais, entao twitta. (pequeno bug que contornei.)
 					try:
 						credentials = userP.twitter_api.verify_credentials()
+						verbose = True
 						if credentials:
 							try:
 								if len(msg) > 140:
 									#Mensagens com mais de 140 caracteres tem q haver excecao.
 									raise Exception()
+								if msg.startswith('->'):
+									verbose = False
+									msg = msg[2:]
 								resp = userP.twitter_api.tweet(msg.encode('utf-8'))
 								#tudo ok
-								resp  = simplejson.loads(resp)
-								msg = 'Tweet sent successfuly: http://twitter.com/%s/statuses/%s' % (resp['user']['screen_name'], str(resp['id']))
-								send_msg(userkey,msg,response)
+								resp  = simplejson.loads(resp)			
+								if verbose:
+									msg = 'Tweet sent successfuly: http://twitter.com/%s/statuses/%s' % (resp['user']['screen_name'], str(resp['id']))
+									send_msg(userkey,msg,response)
 								response.write('<goto=2>')
 							except:
 								#Problemas com o tweet.
