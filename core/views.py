@@ -14,7 +14,7 @@ def send_msg(userkey,tp,resp):
 	url = 'www.imified.com'
 	
 	form_fields = { 
-		"botkey": "DCA2809D-E272-4EB9-8272CEFF6C23D231",    # Your bot key goes here.
+		"botkey": "",    # Your bot key goes here.
 		"apimethod": "send",  # the API method to call.
 		"userkey": str(userkey),  # User Key to lookup with getuser.
 		"msg": tp.encode('utf-8'),
@@ -23,7 +23,7 @@ def send_msg(userkey,tp,resp):
 	
 	
 	# Build the Basic Authentication string.  Don't forget the [:-1] at the end!
-	base64string = base64.encodestring('%s:%s' % ('caraciol@gmail.com', 'mpcara'))[:-1]
+	base64string = base64.encodestring('%s:%s' % ('youremaill@email.com', 'password'))[:-1]
 	authString = 'Basic %s' % base64string
 	
 	
@@ -35,7 +35,8 @@ def send_msg(userkey,tp,resp):
 	con.request('POST','/api/bot/', form_data,{'AUTHORIZATION': authString})
 	response = con.getresponse()	
 	if response.status == 200:
-		resp.write(tp)
+		#resp.write(tp)
+		pass
 	else:
 		resp.write(response.reason + ' ' +  str(response.status))
 		
@@ -59,6 +60,10 @@ def tweet_talk_callback(request,template=""):
 		users = User.objects.filter(userkey__exact = userkey)
 		if users:
 			userP = users[0]
+			#verbose
+			#if msg.startswith('->'):
+			#	step = 2
+				
 			if step == 1:				
 				#Primeira vez que chegou vamos ver o que fazer
 				credentials = userP.twitter_api.verify_credentials()
